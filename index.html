@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>自動検知システム</title>
+  <title>推し活自動確保システム</title>
   
   <link rel="manifest" href="manifest.json">
   
@@ -28,6 +28,10 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       margin-bottom: 20px;
     }
+    .budget-card {
+      border: 2px solid #38a169;
+      background-color: #f0fff4;
+    }
     button {
       background-color: #38a169;
       color: white;
@@ -51,7 +55,6 @@
       white-space: pre-wrap; 
     }
     
-    /* 商品リスト・履歴共通のギャラリーデザイン */
     .gallery {
       margin-top: 20px;
       display: flex;
@@ -79,32 +82,37 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 5px;
     }
     .item-name {
       font-size: 14px;
       font-weight: bold;
       color: #2d3748;
     }
+    .item-price {
+      font-size: 13px;
+      color: #e53e3e;
+      font-weight: bold;
+    }
     .item-date {
-      font-size: 12px;
+      font-size: 11px;
       color: #718096;
     }
     
-    /* 記録・削除用の小型ボタン */
     .btn-small {
       padding: 8px 12px;
       font-size: 12px;
       border-radius: 6px;
       width: auto;
       align-self: flex-start;
+      margin-top: 5px;
     }
     .btn-record { background-color: #ed8936; }
     .btn-record:active { background-color: #dd6b20; }
     .btn-delete { background-color: #e53e3e; }
     .btn-delete:active { background-color: #c53030; }
+    .btn-budget { background-color: #4a5568; padding: 6px 10px; margin: 0;}
     
-    /* 区切り線 */
     hr {
       border: none;
       border-top: 2px dashed #cbd5e0;
@@ -114,9 +122,22 @@
 </head>
 <body>
 
-  <h1>自動検知システム</h1>
+  <h1>推し活検知システム</h1>
+
+  <!-- 追加：お財布（予算管理）エリア -->
+  <div class="card budget-card">
+    <h2 style="font-size: 18px; color: #2c7a51; margin-top: 0;">お財布（予算管理）</h2>
+    <div style="margin-bottom: 15px; font-size: 14px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+      予算設定: 
+      <input type="number" id="budgetInput" style="width: 80px; padding: 5px; text-align: right;"> 円
+      <button id="updateBudgetBtn" class="btn-small btn-budget">更新</button>
+    </div>
+    <div style="font-size: 16px; font-weight: bold; color: #333;">
+      購入履歴の合計: <span id="totalCost" style="color: #4a5568;">0</span> 円<br><br>
+      現在の残り: <span id="remainingBudget" style="color: #e53e3e; font-size: 24px;">0</span> 円
+    </div>
+  </div>
   
-  <!-- 検知エリア -->
   <div class="card">
     <p>ポケモンセンターオンラインの<br>「ユニラン」関連グッズを検知します。</p>
     <button id="checkButton">在庫状況を確認する</button>
@@ -126,46 +147,76 @@
 
   <hr>
 
-  <!-- 購入履歴エリア -->
   <div class="card">
     <h2 style="font-size: 18px; color: #4a5568; margin-top: 0;">購入履歴</h2>
-    <p style="font-size: 13px; color: #718096; margin-bottom: 20px;">記録した商品はここに保存されます。</p>
+    <p style="font-size: 13px; color: #718096; margin-bottom: 20px;">記録した商品は予算から自動で引かれます。</p>
     <div id="historyGallery" class="gallery"></div>
   </div>
 
   <script>
-    // --- ローカルストレージ（購入履歴）を管理する機能 ---
-    const STORAGE_KEY = 'oshikatsu_history';
+    // --- ローカルストレージ管理機能 ---
+    const STORAGE_KEY_HISTORY = 'oshikatsu_history';
+    const STORAGE_KEY_BUDGET = 'oshikatsu_budget';
 
-    // 履歴を読み込む関数
     function loadHistory() {
-      const historyStr = localStorage.getItem(STORAGE_KEY);
+      const historyStr = localStorage.getItem(STORAGE_KEY_HISTORY);
       return historyStr ? JSON.parse(historyStr) : [];
     }
 
-    // 履歴を保存する関数
     function saveHistory(historyArray) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(historyArray));
-      renderHistory(); // 保存したら画面を更新する
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(historyArray));
+      renderHistory();
+      renderBudget(); // 履歴が更新されたら残高も再計算する
     }
 
-    // 履歴を画面に表示する関数
+    // 予算を読み込んで画面を更新する機能
+    function renderBudget() {
+      // 予算が未設定の場合は20000円を標準にする
+      let initialBudget = localStorage.getItem(STORAGE_KEY_BUDGET);
+      if (!initialBudget) {
+        initialBudget = 20000;
+        localStorage.setItem(STORAGE_KEY_BUDGET, initialBudget);
+      }
+      
+      document.getElementById('budgetInput').value = initialBudget;
+      
+      // 履歴から合計金額を計算する
+      const history = loadHistory();
+      let totalCost = 0;
+      history.forEach(item => {
+        totalCost += (item.price || 0); // 価格データがない古い履歴は0円扱い
+      });
+      
+      const remaining = initialBudget - totalCost;
+      
+      // 画面に数値をカンマ付きで表示
+      document.getElementById('totalCost').innerText = totalCost.toLocaleString();
+      document.getElementById('remainingBudget').innerText = remaining.toLocaleString();
+    }
+
+    // 予算の「更新」ボタンを押した時の処理
+    document.getElementById('updateBudgetBtn').addEventListener('click', () => {
+      const newBudget = document.getElementById('budgetInput').value;
+      if(newBudget !== "") {
+        localStorage.setItem(STORAGE_KEY_BUDGET, newBudget);
+        renderBudget();
+        alert(`予算を ${Number(newBudget).toLocaleString()} 円に設定しました！`);
+      }
+    });
+
     function renderHistory() {
       const historyGallery = document.getElementById('historyGallery');
       const history = loadHistory();
       
-      historyGallery.innerHTML = ""; // 一旦クリア
+      historyGallery.innerHTML = "";
       
       if (history.length === 0) {
         historyGallery.innerHTML = '<p style="font-size:14px; color:#a0aec0;">履歴はまだありません。</p>';
         return;
       }
       
-      // 新しい履歴が上に来るように逆順で表示
       [...history].reverse().forEach((item, index) => {
-        // 元の配列における正しいインデックスを計算
         const originalIndex = history.length - 1 - index;
-        
         const itemDiv = document.createElement('div');
         itemDiv.className = 'item-card';
         
@@ -181,21 +232,27 @@
         nameEl.innerText = item.name;
         nameEl.className = 'item-name';
         
+        // 価格を表示
+        const priceEl = document.createElement('div');
+        priceEl.innerText = item.price ? `¥${item.price.toLocaleString()}` : "価格不明";
+        priceEl.className = 'item-price';
+        
         const dateEl = document.createElement('div');
         dateEl.innerText = `記録日: ${item.date}`;
         dateEl.className = 'item-date';
         
         const deleteBtn = document.createElement('button');
-        deleteBtn.innerText = "削除";
+        deleteBtn.innerText = "削除して予算に戻す";
         deleteBtn.className = 'btn-small btn-delete';
         deleteBtn.onclick = () => {
-          if (confirm(`「${item.name}」の履歴を削除しますか？`)) {
+          if (confirm(`「${item.name}」の履歴を削除しますか？\n(金額は予算に戻ります)`)) {
             history.splice(originalIndex, 1);
             saveHistory(history);
           }
         };
         
         infoDiv.appendChild(nameEl);
+        infoDiv.appendChild(priceEl);
         infoDiv.appendChild(dateEl);
         infoDiv.appendChild(deleteBtn);
         
@@ -205,11 +262,13 @@
       });
     }
 
-    // 画面読み込み時に履歴を表示
-    window.addEventListener('load', renderHistory);
+    // 画面読み込み時の初期化
+    window.addEventListener('load', () => {
+      renderHistory();
+      renderBudget();
+    });
 
-
-    // --- 在庫確認と検知の機能 ---
+    // --- 在庫確認と検知機能 ---
     document.getElementById('checkButton').addEventListener('click', async () => {
       const resultText = document.getElementById('resultText');
       const gallery = document.getElementById('gallery');
@@ -246,23 +305,27 @@
               nameEl.innerText = item.name;
               nameEl.className = 'item-name';
               
-              // 履歴に記録するボタンを追加
+              // 価格の表示
+              const priceEl = document.createElement('div');
+              priceEl.innerText = item.price ? `¥${item.price.toLocaleString()}` : "価格不明";
+              priceEl.className = 'item-price';
+              
               const recordBtn = document.createElement('button');
               recordBtn.innerText = "履歴に記録";
               recordBtn.className = 'btn-small btn-record';
               recordBtn.onclick = () => {
                 const history = loadHistory();
-                // 日付を取得（YYYY/MM/DD形式）
                 const today = new Date();
                 const dateStr = `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`;
                 
-                // 履歴に追加して保存
-                history.push({ name: item.name, image: item.image, date: dateStr });
+                // 価格を含めて保存
+                history.push({ name: item.name, image: item.image, price: item.price, date: dateStr });
                 saveHistory(history);
-                alert(`「${item.name}」を履歴に記録しました！`);
+                alert(`「${item.name}」を履歴に記録し、残高から引き落としました！`);
               };
               
               infoDiv.appendChild(nameEl);
+              infoDiv.appendChild(priceEl);
               infoDiv.appendChild(recordBtn);
               
               itemDiv.appendChild(imgEl);
@@ -271,7 +334,7 @@
             });
           } else {
             const notice = document.createElement('p');
-            notice.innerText = "※商品は検知されましたが、画像の抽出には失敗しました。";
+            notice.innerText = "※商品は検知されましたが、情報の抽出には失敗しました。";
             notice.style.fontSize = "12px";
             gallery.appendChild(notice);
           }
