@@ -109,7 +109,8 @@
       const apiUrl = 'https://script.google.com/macros/s/AKfycbyGK3nDcnOwtHbNcUlfVeYdEh9wQZUh6LL1aFdg1thX_bCG_mCzJaj_MMCfZ3k0laoP/exec';
       
       try {
-        const response = await fetch(apiUrl);
+        // キャッシュ（古い記憶）を強制的に無視して最新のデータを取得する
+        const response = await fetch(apiUrl + '?t=' + new Date().getTime());
         const data = await response.json();
         
         if (data.detected) {
