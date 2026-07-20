@@ -5,14 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>推し活自動確保システム</title>
   
-  <!-- PWA化に必要なマニフェストファイルの読み込み -->
   <link rel="manifest" href="manifest.json">
   
   <style>
-    /* スマートフォン向けのデザイン設定 */
     body {
       font-family: 'Helvetica Neue', Arial, sans-serif;
-      background-color: #f0f8f4; /* 薄いグリーン系 */
+      background-color: #f0f8f4; 
       color: #333;
       margin: 0;
       padding: 20px;
@@ -20,7 +18,7 @@
     }
     h1 {
       font-size: 22px;
-      color: #2c7a51; /* ランクルスなどを連想させるグリーン */
+      color: #2c7a51; 
       margin-bottom: 20px;
     }
     .card {
@@ -50,7 +48,37 @@
       margin-top: 20px;
       font-size: 15px;
       line-height: 1.5;
-      white-space: pre-wrap; /* 改行を正しく表示 */
+      white-space: pre-wrap; 
+    }
+    
+    /* 追加：画像ギャラリー用のデザイン */
+    #gallery {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .item-card {
+      background: #f9f9f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .item-img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      border-radius: 4px;
+      background: white;
+    }
+    .item-name {
+      font-size: 14px;
+      text-align: left;
+      font-weight: bold;
+      color: #2d3748;
     }
   </style>
 </head>
@@ -62,16 +90,23 @@
     <p>ポケモンセンターオンラインの<br>「ユニラン」関連グッズを検知します。</p>
     <button id="checkButton">在庫状況を確認する</button>
     <p id="resultText">待機中...</p>
+    
+    <!-- 追加：商品画像を表示するためのエリア -->
+    <div id="gallery"></div>
   </div>
 
   <script>
-    // --- 1. API通信の処理 ---
     document.getElementById('checkButton').addEventListener('click', async () => {
       const resultText = document.getElementById('resultText');
-      resultText.innerText = "ポケモンセンターオンラインを確認中...";
+      const gallery = document.getElementById('gallery');
       
-      // ★注意★：以下の '' の中に、先ほど発行したGASのウェブアプリURLを貼り付けてください
-      const apiUrl = 'https://script.google.com/macros/s/AKfycbwaQrAY9GoP3prCvv0focEsGr3fPtjaz-xwwKjNrdNQfdPTwaNjcQi25UDHiOV6-K-s/exec';
+      // 表示をリセット
+      resultText.innerText = "ポケモンセンターオンラインを確認中...";
+      resultText.style.color = "black";
+      gallery.innerHTML = ""; 
+      
+      // ★注意★：新しいAPIのURLを貼り付けてください
+      const apiUrl = '★ここにGASのURLを貼り付ける★';
       
       try {
         const response = await fetch(apiUrl);
@@ -79,8 +114,40 @@
         
         if (data.detected) {
           resultText.innerText = `【検知成功】\n新しいグッズが販売中です！\n確認日時: ${data.timestamp}`;
-          resultText.style.color = "#d53f8c"; // 目立つピンクレッド
+          resultText.style.color = "#d53f8c"; 
           resultText.style.fontWeight = "bold";
+          
+          // 追加：取得した商品データ（items）が存在すれば画面に表示する
+          if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+              // 商品の枠を作る
+              const itemDiv = document.createElement('div');
+              itemDiv.className = 'item-card';
+              
+              // 画像を作る
+              const imgEl = document.createElement('img');
+              imgEl.src = item.image;
+              imgEl.alt = item.name;
+              imgEl.className = 'item-img';
+              
+              // 名前を作る
+              const nameEl = document.createElement('div');
+              nameEl.innerText = item.name;
+              nameEl.className = 'item-name';
+              
+              // 枠にセットして画面に追加
+              itemDiv.appendChild(imgEl);
+              itemDiv.appendChild(nameEl);
+              gallery.appendChild(itemDiv);
+            });
+          } else {
+            // 画像がうまく抽出できなかった場合のフォロー
+            const notice = document.createElement('p');
+            notice.innerText = "※商品は検知されましたが、画像の抽出には失敗しました。";
+            notice.style.fontSize = "12px";
+            gallery.appendChild(notice);
+          }
+          
         } else {
           resultText.innerText = `現在、新しいグッズは見つかりませんでした。\n確認日時: ${data.timestamp}`;
           resultText.style.color = "#4a5568";
@@ -92,16 +159,10 @@
       }
     });
 
-    // --- 2. Service Workerの登録処理（PWA化に必須） ---
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')
-          .then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          })
-          .catch(err => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
+          .catch(err => console.log('ServiceWorker registration failed: ', err));
       });
     }
   </script>
