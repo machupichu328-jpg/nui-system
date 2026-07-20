@@ -1,0 +1,21 @@
+{
+  "name": "グッズ確保システム",
+  "short_name": "自動確保",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#3b82f6",
+  "description": "情報戦を回避する自動確保ダッシュボード",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/3b82f6/ffffff?text=App",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/3b82f6/ffffff?text=App",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
