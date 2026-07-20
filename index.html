@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>推し活自動確保システム</title>
+  <title>自動検知システム</title>
   
   <link rel="manifest" href="manifest.json">
   
@@ -51,8 +51,8 @@
       white-space: pre-wrap; 
     }
     
-    /* 追加：画像ギャラリー用のデザイン */
-    #gallery {
+    /* 商品リスト・履歴共通のギャラリーデザイン */
+    .gallery {
       margin-top: 20px;
       display: flex;
       flex-direction: column;
@@ -66,6 +66,7 @@
       display: flex;
       align-items: center;
       gap: 15px;
+      text-align: left;
     }
     .item-img {
       width: 80px;
@@ -74,44 +75,152 @@
       border-radius: 4px;
       background: white;
     }
+    .item-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
     .item-name {
       font-size: 14px;
-      text-align: left;
       font-weight: bold;
       color: #2d3748;
+    }
+    .item-date {
+      font-size: 12px;
+      color: #718096;
+    }
+    
+    /* 記録・削除用の小型ボタン */
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 12px;
+      border-radius: 6px;
+      width: auto;
+      align-self: flex-start;
+    }
+    .btn-record { background-color: #ed8936; }
+    .btn-record:active { background-color: #dd6b20; }
+    .btn-delete { background-color: #e53e3e; }
+    .btn-delete:active { background-color: #c53030; }
+    
+    /* 区切り線 */
+    hr {
+      border: none;
+      border-top: 2px dashed #cbd5e0;
+      margin: 30px 0;
     }
   </style>
 </head>
 <body>
 
-  <h1>推し活検知システム</h1>
+  <h1>自動検知システム</h1>
   
+  <!-- 検知エリア -->
   <div class="card">
     <p>ポケモンセンターオンラインの<br>「ユニラン」関連グッズを検知します。</p>
     <button id="checkButton">在庫状況を確認する</button>
     <p id="resultText">待機中...</p>
-    
-    <!-- 追加：商品画像を表示するためのエリア -->
-    <div id="gallery"></div>
+    <div id="gallery" class="gallery"></div>
+  </div>
+
+  <hr>
+
+  <!-- 購入履歴エリア -->
+  <div class="card">
+    <h2 style="font-size: 18px; color: #4a5568; margin-top: 0;">購入履歴</h2>
+    <p style="font-size: 13px; color: #718096; margin-bottom: 20px;">記録した商品はここに保存されます。</p>
+    <div id="historyGallery" class="gallery"></div>
   </div>
 
   <script>
+    // --- ローカルストレージ（購入履歴）を管理する機能 ---
+    const STORAGE_KEY = 'oshikatsu_history';
+
+    // 履歴を読み込む関数
+    function loadHistory() {
+      const historyStr = localStorage.getItem(STORAGE_KEY);
+      return historyStr ? JSON.parse(historyStr) : [];
+    }
+
+    // 履歴を保存する関数
+    function saveHistory(historyArray) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(historyArray));
+      renderHistory(); // 保存したら画面を更新する
+    }
+
+    // 履歴を画面に表示する関数
+    function renderHistory() {
+      const historyGallery = document.getElementById('historyGallery');
+      const history = loadHistory();
+      
+      historyGallery.innerHTML = ""; // 一旦クリア
+      
+      if (history.length === 0) {
+        historyGallery.innerHTML = '<p style="font-size:14px; color:#a0aec0;">履歴はまだありません。</p>';
+        return;
+      }
+      
+      // 新しい履歴が上に来るように逆順で表示
+      [...history].reverse().forEach((item, index) => {
+        // 元の配列における正しいインデックスを計算
+        const originalIndex = history.length - 1 - index;
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'item-card';
+        
+        const imgEl = document.createElement('img');
+        imgEl.src = item.image;
+        imgEl.alt = item.name;
+        imgEl.className = 'item-img';
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'item-info';
+        
+        const nameEl = document.createElement('div');
+        nameEl.innerText = item.name;
+        nameEl.className = 'item-name';
+        
+        const dateEl = document.createElement('div');
+        dateEl.innerText = `記録日: ${item.date}`;
+        dateEl.className = 'item-date';
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerText = "削除";
+        deleteBtn.className = 'btn-small btn-delete';
+        deleteBtn.onclick = () => {
+          if (confirm(`「${item.name}」の履歴を削除しますか？`)) {
+            history.splice(originalIndex, 1);
+            saveHistory(history);
+          }
+        };
+        
+        infoDiv.appendChild(nameEl);
+        infoDiv.appendChild(dateEl);
+        infoDiv.appendChild(deleteBtn);
+        
+        itemDiv.appendChild(imgEl);
+        itemDiv.appendChild(infoDiv);
+        historyGallery.appendChild(itemDiv);
+      });
+    }
+
+    // 画面読み込み時に履歴を表示
+    window.addEventListener('load', renderHistory);
+
+
+    // --- 在庫確認と検知の機能 ---
     document.getElementById('checkButton').addEventListener('click', async () => {
       const resultText = document.getElementById('resultText');
       const gallery = document.getElementById('gallery');
       
-      // 表示をリセット
       resultText.innerText = "ポケモンセンターオンラインを確認中...";
       resultText.style.color = "black";
       gallery.innerHTML = ""; 
       
-      // ★注意★：新しいAPIのURLを貼り付けてください
-     // 書き換え後（コピーした新しいURLを貼り付けます）
-// ※前回お伝えしたキャッシュ回避の ?t=... も付けておくとより確実です
-const apiUrl = 'https://script.google.com/macros/s/AKfycbyUQ0IRrvBsLxLc1WyUEwZDEbaOJkBXxLFww7ilikq7PQIZo5ARdIN7f8ZC0r9lPeAN/exec'
+      const apiUrl = 'https://script.google.com/macros/s/AKfycbyUQ0IRrvBsLxLc1WyUEwZDEbaOJkBXxLFww7ilikq7PQIZo5ARdIN7f8ZC0r9lPeAN/exec';
       
       try {
-        // キャッシュ（古い記憶）を強制的に無視して最新のデータを取得する
         const response = await fetch(apiUrl + '?t=' + new Date().getTime());
         const data = await response.json();
         
@@ -120,31 +229,47 @@ const apiUrl = 'https://script.google.com/macros/s/AKfycbyUQ0IRrvBsLxLc1WyUEwZDE
           resultText.style.color = "#d53f8c"; 
           resultText.style.fontWeight = "bold";
           
-          // 追加：取得した商品データ（items）が存在すれば画面に表示する
           if (data.items && data.items.length > 0) {
             data.items.forEach(item => {
-              // 商品の枠を作る
               const itemDiv = document.createElement('div');
               itemDiv.className = 'item-card';
               
-              // 画像を作る
               const imgEl = document.createElement('img');
               imgEl.src = item.image;
               imgEl.alt = item.name;
               imgEl.className = 'item-img';
               
-              // 名前を作る
+              const infoDiv = document.createElement('div');
+              infoDiv.className = 'item-info';
+              
               const nameEl = document.createElement('div');
               nameEl.innerText = item.name;
               nameEl.className = 'item-name';
               
-              // 枠にセットして画面に追加
+              // 履歴に記録するボタンを追加
+              const recordBtn = document.createElement('button');
+              recordBtn.innerText = "履歴に記録";
+              recordBtn.className = 'btn-small btn-record';
+              recordBtn.onclick = () => {
+                const history = loadHistory();
+                // 日付を取得（YYYY/MM/DD形式）
+                const today = new Date();
+                const dateStr = `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`;
+                
+                // 履歴に追加して保存
+                history.push({ name: item.name, image: item.image, date: dateStr });
+                saveHistory(history);
+                alert(`「${item.name}」を履歴に記録しました！`);
+              };
+              
+              infoDiv.appendChild(nameEl);
+              infoDiv.appendChild(recordBtn);
+              
               itemDiv.appendChild(imgEl);
-              itemDiv.appendChild(nameEl);
+              itemDiv.appendChild(infoDiv);
               gallery.appendChild(itemDiv);
             });
           } else {
-            // 画像がうまく抽出できなかった場合のフォロー
             const notice = document.createElement('p');
             notice.innerText = "※商品は検知されましたが、画像の抽出には失敗しました。";
             notice.style.fontSize = "12px";
